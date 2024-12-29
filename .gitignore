@@ -1,0 +1,12 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+
+# exclude input and output files
+input_files/*
+output_files/*
+
+# but keep directories
+!output_files/gitkeep.txt
+!input_files/gitkeep.txt

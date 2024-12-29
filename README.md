@@ -16,7 +16,10 @@ This analysis uses [jsonlite](https://cran.r-project.org/web/packages/jsonlite/i
 install.packages(c("jsonlite", "dplyr", "tidyr", "lubridate", "ggplot2", "svglite"))
 ```
 
-To generate an automatic report in RStudio, decompress the JSON files, place them in the `input_files` directory, open `spotify_data_analysis.Rproj` and `spotify_streaming_analysis.qmd`, then click the "Render" button (if you're not familiar with Quarto rendering, check this [tutorial](https://quarto.org/docs/get-started/hello/rstudio.html#rendering)).
+To generate an automatic report in RStudio, decompress the JSON files, place them in the `input_files` directory, open `spotify_data_analysis.Rproj` and `spotify_stream_analysis.qmd`, then click the "Render" button (if you're not familiar with Quarto rendering, check this [tutorial](https://quarto.org/docs/get-started/hello/rstudio.html#rendering)).
 
 ## Data description
 The streaming history contains a lot of data: Stream end time in UTC, platform used, play time, track details (name, artist, and album), podcast information (episodes and shows), unique identifiers such as track/episode URIs, and various playback details such as shuffle mode, skips, and offline status. You can find a better description of this data in Spotify's [Understanding my data](https://support.spotify.com/uk/article/understanding-my-data/) article.
+
+## Example
+You can find an example of the report at: https://nataliaciria.com/spotify-stream-history-analyis/
