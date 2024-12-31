@@ -105,7 +105,7 @@ by_year <- stream %>%
   group_by(year = as.factor(year(date))) %>%
   summarise(h_played = sum(ms_played)/1000/60/60,
             n_tracks=n(),
-            n_songs=n_distinct(n_tracks),
+            n_songs=n_distinct(track_name),
             n_artists=n_distinct(artist_name)) 
 
 # Display table
@@ -372,9 +372,7 @@ by_top_day%>%
     Date=day_date,
     Hours=round(h_played,2),
     `N tracks`=n_tracks,
-    `% tracks replayed`=paste0(round(mult_times,4)*100, "%"),
-    `% tracks on the computer`=paste0(round(computer,4)*100, "%"),
-    `% tracks on shuffle`=paste0(round(computer,4)*100, "%"))%>%
+    `% tracks replayed`=paste0(round(mult_times,4)*100, "%"))%>%
   kable(caption="Top 10 days by listening hours")
 ```
 
@@ -710,7 +708,7 @@ top_track_all <- by_track_year %>%
   slice_max(n_tracks_all, n = 30) %>%
   select(track_name, n_tracks_all, min_played_all) %>%
   bind_rows(top_track_year) %>%
-  distinct()
+  na.omit(distinct())
 
 
 # Create heatmap visualization
