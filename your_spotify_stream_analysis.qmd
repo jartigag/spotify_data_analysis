@@ -22,6 +22,7 @@ save_csv <- TRUE # Export stream data frame as csv
 save_svg <- TRUE # Export ggplots as svg files
 
 # Required libraries
+
 library(jsonlite) # Working with JSON data
 library(dplyr) # Data transformation
 library(tidyr) # Data cleaning
@@ -52,7 +53,7 @@ for(i in 2:length(stream_files)){
 
 ```{r}
 # Process Spotify streaming data
-stream <- stream %>% 
+stream <- stream %>%
   mutate(
     # Convert timestamp and rename metadata columns
     date = as_datetime(ts, tz = "UTC"),
@@ -62,8 +63,9 @@ stream <- stream %>%
     
     # Categorize device types
     Device = case_when(
-      grepl("Android-tablet|Android OS|android|android_tv", platform) ~ "Phone",
-      grepl("public_js|web_player|WebPlayer|chrome|Windows 10|Linux [x86-64 0]|windows|linux", platform) ~ "Computer",
+      grepl("Android-tablet|Android OS|android|iOS|ios", platform) ~ "Mobile",
+      grepl("public_js|web_player|WebPlayer|chrome|Windows|windows|Linux|linux", platform) ~ "PC",
+      grepl("cast|tv", platform) ~ "TV",
     ),
     
     # Categorize track end reasons
@@ -99,6 +101,7 @@ if(save_csv) write.csv(stream, "output_files/stream.csv")
 ```{r}
 # Calculate total listening hours by year
 by_year <- stream %>%
+  filter(year(date)>=threshold_year) %>% # Filter data from threshold year onwards
   group_by(year = as.factor(year(date))) %>%
   summarise(h_played = sum(ms_played)/1000/60/60,
             n_tracks=n(),
@@ -123,6 +126,7 @@ kable(caption="Spotify listened by year")
 ```{r}
 # Calculate total listening hours by year and device
 by_device <- stream %>%
+  filter(year(date)>=threshold_year) %>% # Filter data from threshold year onwards
   group_by(Device, year = as.factor(year(date))) %>%
   summarise(h_played = sum(ms_played)/1000/60/60) 
 
@@ -260,9 +264,12 @@ if(save_svg) ggsave(paste0("plot_reason_end_shuffle",".svg"), path = "output_fil
 ```{r}
 #| fig.height: 7.6
 # Create a dataframe with all days in the date range
+date_range <- stream %>%
+  filter(year(date)>=threshold_year) # Filter data from threshold year onwards
+
 all_days <- data.frame(
-  day_date = seq(as.Date(floor_date(min(stream$date), unit="year")),
-                as.Date(ceiling_date(max(stream$date), unit="year")-1), 
+  day_date = seq(as.Date(floor_date(min(date_range$date), unit="year")),
+                as.Date(ceiling_date(max(date_range$date), unit="year")-1), 
                 by="days")) %>%
   mutate(day_n = row_number())
 
@@ -276,8 +283,8 @@ first_week_day <- all_days %>%
             days_year = n())
 
 # Process streaming data by day
-by_day_year <- stream %>%
-  mutate(day_date = date(stream$date)) %>%
+by_day_year <- date_range %>%
+  mutate(day_date = date(date_range$date)) %>%
   right_join(all_days) %>%
   group_by(day_date, day_n) %>%
   # Calculate daily metrics
@@ -322,57 +329,23 @@ plot_day_year
 if(save_svg) ggsave(paste0("plot_day_year",".svg"), width=7, height=8, path="output_files/")
 ```
 
-### Other calendars
-
-```{r, output=FALSE}
-# Other calendars - not included in the automatic report
-
-# Plot for computer usage
-by_day_year %>%
-  ggplot(aes(x = weekday, y = -calendar_row, fill=computer)) +
-  geom_tile() +
-  facet_grid(cols=vars(year), rows=vars(month), scales = "free") +
-  theme_void() +
-  scale_fill_gradientn(colors=c("grey95", pal[c(1,3,2)]), na.value="grey95") +
-  ggtitle("% of tracks listened on the computer per day") +
-  ylab("")
-
-# Plot for incognito mode usage
-by_day_year %>%
-  ggplot(aes(x = weekday, y = -calendar_row, fill=incognito_mode)) +
-  geom_tile() +
-  facet_grid(cols=vars(year), rows=vars(month), scales = "free") +
-  theme_void() +
-  scale_fill_gradientn(colors=c("grey95", pal[c(1,3,2)]), na.value="grey95") +
-  ggtitle("% of tracks listened in incognito mode") +
-  ylab("")
-
-# Plot for offline mode
-by_day_year %>%
-  ggplot(aes(x = weekday, y = -calendar_row, fill=offline)) +
-  geom_tile() +
-  facet_grid(cols=vars(year), rows=vars(month), scales = "free") +
-  theme_void() +
-  scale_fill_gradientn(colors=c("grey95", pal[c(1,3,2)]), na.value="grey95") +
-  ggtitle("% of tracks listened offline") +
-  ylab("")
-```
-
 ### Top days
 
 ```{r}
 # Create summary of number of times a track was listened in a day
-by_top_track_day <- stream %>%
-  mutate(day_date = date(stream$date)) %>%
+date_range <- stream %>%
+  filter(year(date)>=threshold_year) # Filter data from threshold year onwards
+
+by_top_track_day <- date_range %>%
+  mutate(day_date = date(date_range$date)) %>%
   group_by(track_name, day_date) %>%
   summarise(n_tracks = n())%>%
   ungroup() %>%
   arrange(desc(n_tracks))
 
-
 # Get top 10 days by hours played
-by_top_day <- stream %>%
-  mutate(day_date = date(stream$date)) %>%
+by_top_day <- date_range %>%
+  mutate(day_date = date(date_range$date)) %>%
   group_by(day_date) %>%
   summarise(
     n_tracks_all = n(),
@@ -411,10 +384,12 @@ by_top_day%>%
 # Create a dataframe with all possible hours for each day
 all_hours <- all_days %>% expand(day_date, hour=1:24)
 
+date_range <- stream %>%
+  filter(year(date)>=threshold_year) # Filter data from threshold year onwards
 
 # Calculate average listening time by hour and year
-by_hour_year <- stream %>%
-  mutate(day_date = date(stream$date),
+by_hour_year <- date_range %>%
+  mutate(day_date = date(date_range$date),
          hour = hour(date)) %>%
   right_join(all_hours) %>% 
   group_by(day_date, hour) %>%
@@ -450,6 +425,7 @@ if(save_svg) ggsave(paste0("plot_hour_year",".svg"), width = 7, height = 5, path
 ```{r}
 # Calculate statistics by year
 by_year <- stream %>%
+  filter(year(date)>=threshold_year) %>% # Filter data from threshold year onwards
   group_by(year = year(date)) %>%
   summarise(
     min_played_year = sum(ms_played)/1000/60,
@@ -459,6 +435,7 @@ by_year <- stream %>%
 
 # Calculate statistics by artist and year
 by_artist_year <- stream %>%
+  filter(year(date)>=threshold_year) %>% # Filter data from threshold year onwards
   group_by(artist_name, year = year(date)) %>%
   summarise(
     min_played = sum(ms_played/1000/60),
@@ -520,6 +497,7 @@ top_artist_year <- by_artist_year %>%
 
 # Calculate statistics by artist
 by_artist_all <- stream %>%
+  filter(year(date)>=threshold_year) %>% # Filter data from threshold year onwards
   # Split multiple artists into separate rows
   separate_wider_delim(
     artist_name, 
@@ -679,6 +657,7 @@ if(save_svg) ggsave(paste0("plot_top_artist_matrix", ".svg"), width = 8, height 
 ```{r}
 # Calculate total play time and count for each track
 top_track <- stream %>%
+  filter(year(date)>=threshold_year) %>% # Filter data from threshold year onwards
   group_by(track_name, artist_name) %>%
   summarise(
     min_played = sum(ms_played/1000/60),  # Convert ms to minutes
@@ -689,12 +668,12 @@ top_track <- stream %>%
 
 # Display table
 top_track[1:10,]%>%
-  transmute(
+  na.omit(transmute(
     `Track` = track_name,
     `Artist` = artist_name,
     `Minutes played` = round(min_played,2),
     `N tracks` = `n_tracks`
-  )%>%
+  ))%>%
   kable(caption="Top 10 tracks")
 ```
 
@@ -702,6 +681,7 @@ top_track[1:10,]%>%
 #| fig.height: 10
 # Calculate statistics by track and year
 by_track_year <- stream %>%
+  filter(year(date)>=threshold_year) %>% # Filter data from threshold year onwards
   group_by(track_name, year = year(date)) %>%
   summarise(
     min_played = sum(ms_played/1000/60),
@@ -766,6 +746,7 @@ if(save_svg) ggsave(paste0("plot_track_year",".svg"), width = 7, height = 9, pat
 ```{r}
 # Filter and summarize selected tracks
 by_track_select <- stream %>%
+  filter(year(date)>=threshold_year) %>% # Filter data from threshold year onwards
   # Get only selected tracks that have a name
   filter(Start=="Selected", !is.na(track_name)) %>%
   group_by(track_name, artist_name) %>%
@@ -802,9 +783,9 @@ Times played in one day
 ```{r}
 # Display table
 by_top_track_day[1:10,]%>%
-  transmute(Date=day_date,
+  na.omit(transmute(Date=day_date,
             Track=track_name,
-            `N tracks`=n_tracks)%>%
+            `N tracks`=n_tracks))%>%
 kable(caption="Top 10 songs by times played in one day")
 ```
 
@@ -827,60 +808,4 @@ by_top_track_loop%>%
     `Track`=track_name,
     `Days in loop (times played>5)`=n_days)%>%
   kable(caption="Tracks played more than 5 times several days")
-```
-
-### Guilty pleasures (incognito mode)
-
-#### Per year
-
-```{r}
-# Create a plot showing proportion of tracks listened in incognito mode by year
-plot_incognito <- stream %>%
-  group_by(year = as.factor(year(date))) %>%
-  summarise(`Proportion of tracks` = mean(incognito_mode)) %>%
-  ggplot(aes(x = year, y = `Proportion of tracks`)) +
-  geom_col(fill=pal[1]) +
-  theme_minimal() +
-  scale_y_continuous(labels = function(x) paste0(x*100, "%")) +
-  ggtitle("Proportion of tracks listened in incognito mode") +
-  ylab("")
-
-# Display plot
-plot_incognito
-
-# Save plot
-if(save_svg) ggsave(paste0("plot_incognito",".svg"), path = "output_files/")
-```
-
-#### Top incognito tracks
-
-```{r, include=FALSE}
-# Get tracks most frequently listened to in incognito mode
-# This was trickier than spected, I ended up:
-# - Filtering for tracks played in incognito mode at least 5 times
-# - Calculating an score as (proportion in incognito) * (number of incognito plays)
-# - Slicing top 10 tracks by score
-by_incognito_track <- stream %>%
-  group_by(track_name, artist_name) %>%
-  summarise(
-    p_incognito = mean(incognito_mode, na.rm = TRUE),
-    n_incognito = sum(incognito_mode, na.rm = TRUE),
-    score = p_incognito * n_incognito,
-    n_tracks=n(),
-  ) %>%
-  ungroup() %>%
-  filter(n_incognito > 5) %>%
-  slice_max(score, n = 10)
-
-# Display table
-by_incognito_track %>%
-  transmute(
-    `Track` = track_name,
-    `Artist` = artist_name,
-    `Times in incognito` = n_incognito,
-    `% Incognito` = paste0(round(p_incognito,4)*100,"%"),
-    `Incognito score` = round(score,2),
-    `N tracks`= `n_tracks`
-  ) %>%
-  kable(caption="Top tracks in incognito mode")
 ```
