@@ -17,8 +17,7 @@ execute:
 
 ```{r}
 # Set-up parameters
-threshold_year<-2019 # Exclude older years from some anlaysis
-top_artist<- "Taylor Swift" # Exclude one artist from some analysis
+threshold_year<-2018 # Exclude older years from some anlaysis
 save_csv <- TRUE # Export stream data frame as csv
 save_svg <- TRUE # Export ggplots as svg files
 
@@ -289,7 +288,6 @@ by_day_year <- stream %>%
     shuffle = mean(shuffle, na.rm=TRUE),
     incognito_mode = mean(incognito_mode, na.rm=TRUE),
     offline = mean(offline, na.rm=TRUE),
-    h_top_artist = sum(ifelse(grepl(top_artist,artist_name), h_played, 0), na.rm=TRUE)
   ) %>%
   # Add calendar columns
   mutate(
@@ -357,16 +355,6 @@ by_day_year %>%
   theme_void() +
   scale_fill_gradientn(colors=c("grey95", pal[c(1,3,2)]), na.value="grey95") +
   ggtitle("% of tracks listened offline") +
-  ylab("")
-
-# Plot for top artist listening patterns
-by_day_year %>%
-  ggplot(aes(x = weekday, y = -calendar_row, fill=h_top_artist)) +
-  geom_tile() +
-  facet_grid(cols=vars(year), rows=vars(month), scales = "free") +
-  theme_void() +
-  scale_fill_gradientn(colors=c("grey95", pal[c(1,3,2)]), na.value="grey95") +
-  ggtitle(paste0("Hours listened to ",top_artist," per day")) +
   ylab("")
 ```
 
@@ -581,36 +569,6 @@ by_top_artist <- by_artist_year %>%
   arrange(desc(n_tracks)) 
 ```
 
-#### Global - excluding 1 artist
-
-```{r}
-#| fig.height: 9
-# Create heatmap excluding top artist
-plot_top_artist_year_filter<-by_top_artist%>%
-  filter(!artist_name == top_artist) %>%
-  ggplot(aes(x = year, y = reorder(artist_name, -n_tracks_all), fill = n_tracks)) +
-  geom_tile() +
-  theme_void() +
-  facet_grid(
-    cols = vars(year), 
-    rows = vars(reorder(artist_name, -n_tracks_all)), 
-    scales = "free"
-  ) +
-  scale_fill_gradientn(colors = c("grey95", pal[c(1,3,2)])) +
-  ggtitle(paste0("Times listened to most played artists (excluding ", top_artist,")")) +
-  theme(
-    legend.title = element_blank(),
-    axis.text.x = element_blank(), 
-    axis.ticks.x = element_blank()
-  )
-
-# Display plot
-plot_top_artist_year_filter
-
-# Save plot
-if(save_svg) ggsave(paste0("plot_top_artist_year_filter",".svg"), width = 7, height = 9, path = "output_files/")
-```
-
 #### Global
 
 ```{r}
@@ -691,7 +649,6 @@ plot_top_artist_matrix <- by_top_artist_matrix %>%
     year = factor(year, levels = col_order),
     artist_name = factor(artist_name, levels = row_order)
   ) %>%
-  filter(!artist_name %in% top_artist) %>%
   ggplot(aes(x = year, y = artist_name, fill = p_tracks)) +
   geom_tile(position = "identity") +
   theme_void() +
