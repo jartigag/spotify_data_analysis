@@ -42,7 +42,7 @@ pal<- c("#3abdaa","#7b2458","#facd00","#41658a","#e63946","#b2a3b5","#264653")
 stream_files<-list.files("input_files/", pattern="Streaming_History_Audio")
 
 #Merge all streaming history files into a data frame
-#Read and parse playlist data from the fist JSON file
+#Read and parse playlist data from the first JSON file
 stream<-fromJSON(paste0("input_files/",stream_files[1]), flatten = TRUE)
 #loop all
 for(i in 2:length(stream_files)){
@@ -806,4 +806,153 @@ by_top_track_loop%>%
     `Track`=track_name,
     `Days in loop (times played>5)`=n_days)%>%
   kable(caption="Tracks played more than 5 times several days")
+```
+
+## Playlists and Library tracks
+
+### Set up
+
+```{r}
+# Find json streaming history files
+playlist_files<-list.files("input_files/", pattern="Playlist")
+
+#Merge all playlist files into a data frame
+#Read and parse playlist data from the first JSON file
+playlist<-fromJSON(paste0("input_files/",playlist_files[1]), flatten = TRUE)[[1]]
+
+playlist_tracks <- data.frame()
+
+# Loop through each playlist and extract tracks
+for(i in 1:nrow(playlist)){
+  playlist_tracks_i <- playlist$items[[i]]
+  playlist_tracks_i$playlist_name <- playlist$name[i]
+  playlist_tracks <- bind_rows(playlist_tracks, playlist_tracks_i)
+}
+
+# Read library data from JSON file
+library <- fromJSON("input_files/YourLibrary.json", flatten = TRUE)[[1]]
+```
+
+### User playlists
+
+```{r}
+# Process playlist tracks data
+playlist_tracks <- playlist_tracks %>%
+  mutate(
+    added_date = as_datetime(addedDate, tz = "UTC"),
+    artist_name = track.artistName,
+    track_name = track.trackName,
+    album_name = track.albumName
+  )
+
+# Get most common tracks in playlists
+playlist_top_tracks <- playlist_tracks %>%
+  group_by(track_name,artist_name) %>%
+  summarise(n_playlists = n()) %>%
+  arrange(desc(n_playlists))%>%
+  ungroup()
+
+# Display table
+playlist_top_tracks[1:10,]%>%
+  transmute(
+    `Track`=track_name,
+    `Artist` = artist_name,
+    `N playlists` = n_playlists,
+  )%>%
+  kable(caption="Tracks included in more playlists")
+```
+
+```{r}
+# Get most common artists in playlists
+playlist_top_artist<-playlist_tracks%>%
+  group_by(artist_name)%>%
+  summarise(n_tracks=n(),
+            n_songs=n_distinct(track_name),
+            n_playlists=n_distinct(playlist_name))%>%
+  arrange(desc(n_playlists))%>%
+  ungroup()
+
+# Display table
+playlist_top_artist[1:10,]%>%
+  transmute(
+    `Artist` = artist_name,
+    `N tracks` = n_tracks,
+    `N songs` = n_songs,
+    `N playlists` = n_playlists,
+  )%>%
+  kable(caption="Artists included in more playlists")
+```
+
+### User library
+
+```{r}
+# Get most common artists in library (saved songs)
+library_tracks<-library%>%
+  mutate(artist_name = artist,
+         track_name = track,
+         album_name = album)
+
+library_top_artist<-library_tracks%>%
+  group_by(artist_name)%>%
+  summarise(n_songs=n_distinct(track_name))%>%
+  arrange(desc(n_songs))%>%
+  ungroup()
+
+# Display table
+library_top_artist[1:10,]%>%
+  transmute(
+    `Artist` = artist_name,
+    `N songs` = n_songs,
+  )%>%
+  kable(caption="Artists with more songs in library")
+```
+
+### Saved in playlist or library
+
+```{r}
+# Combine tracks from playlists and library 
+saved_tracks <- unique(c(playlist_top_tracks$track_name, library_tracks$track_name))
+
+# Combine artists from playlists and library
+saved_artist <- unique(c(playlist_top_artist$artist_name, library_top_artist$artist_name))
+
+# Plot proportion of tracks in playlists by year
+plot_saved_track <- stream %>%
+  mutate(`In my playlists` = ifelse(track_name %in% saved_tracks, "Yes", "No")) %>%
+  group_by(`In my playlists`, year = as.factor(year(date))) %>%
+  summarise(n = n()) %>%
+  ggplot(aes(x = year, y = n, fill = `In my playlists`)) +
+  geom_col(position = "fill") +
+  scale_fill_manual(values = pal, na.value = "grey80") +
+  scale_y_continuous(labels = function(x) paste0(x*100, "%")) +
+  theme_minimal() +
+  ggtitle("Were the tracks (streaming history) in the current playlists?") +
+  ylab("")
+
+# Display plot
+plot_saved_track
+
+# Save plot
+if(save_svg) ggsave(paste0("plot_saved_track",".svg"), path = "output_files/")
+```
+
+```{r}
+# Plot proportion of artists in playlists by year
+plot_saved_artist <- stream %>%
+  mutate(`In my playlists`=ifelse(artist_name%in%saved_artist,"Yes","No"))%>%
+  group_by(`In my playlists`, year = as.factor(year(date))) %>%
+  summarise(n = n()) %>%
+  ggplot(aes(x = year, y = n, fill = `In my playlists`)) +
+  geom_col(position = "fill") +
+  scale_fill_manual(values = pal, na.value = "grey80") +
+  scale_y_continuous(labels = function(x) paste0(x*100, "%"))+
+  theme_minimal() +
+  ggtitle("Were the artists (streaming history) in the current playlists?")+
+  ylab("")
+
+
+plot_saved_artist
+
+# Save plot
+if(save_svg) ggsave(paste0("plot_saved_artist",".svg"), path = "output_files/")
 ```
