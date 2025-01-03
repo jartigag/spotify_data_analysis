@@ -42,7 +42,7 @@ pal<- c("#3abdaa","#7b2458","#facd00","#41658a","#e63946","#b2a3b5","#264653")
 stream_files<-list.files("input_files/", pattern="Streaming_History_Audio")
 
 #Merge all streaming history files into a data frame
-#Read and parse playlist data from the fist JSON file
+#Read and parse playlist data from the first JSON file
 stream<-fromJSON(paste0("input_files/",stream_files[1]), flatten = TRUE)
 #loop all
 for(i in 2:length(stream_files)){
@@ -945,8 +945,12 @@ by_incognito_track %>%
 ### Set up
 
 ```{r}
-# Read and parse playlist data from JSON file
-playlist <- fromJSON("input_files/Playlist1.json", flatten = TRUE)[[1]]
+# Find json streaming history files
+playlist_files<-list.files("input_files/", pattern="Playlist")
+
+#Merge all playlist files into a data frame
+#Read and parse playlist data from the first JSON file
+playlist<-fromJSON(paste0("input_files/",playlist_files[1]), flatten=TRUE)[[1]]
 
 playlist_tracks <- data.frame()
 
@@ -958,14 +962,15 @@ for(i in 1:nrow(playlist)){
 }
 
 # Read library data from JSON file
-library <- fromJSON("input_files/YourLibrary.json", flatten = TRUE)[[1]]
+library <- fromJSON("input_files/YourLibrary.json", flatten = TRUE)
+library <- merge(library$tracks, library$album, all = TRUE)
 ```
-
 ### User playlists
 
 ```{r}
 # Process playlist tracks data
 playlist_tracks <- playlist_tracks %>%
+  #filter(year(date)>=threshold_year) %>% # Filter data from threshold year onwards
   mutate(
     added_date = as_datetime(addedDate, tz = "UTC"),
     artist_name = track.artistName,
@@ -1014,8 +1019,9 @@ playlist_top_artist[1:10,]%>%
 ### User library
 
 ```{r}
-# Get most common artists in library (saved songs)
+# Get most common artists in library (saved songs) #TODO: and albums
 library_tracks<-library%>%
+  #filter(year(date)>=threshold_year) %>% # Filter data from threshold year onwards
   mutate(artist_name = artist,
          track_name = track,
          album_name = album)
